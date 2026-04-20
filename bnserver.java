@@ -1,5 +1,7 @@
 import java.io.*;
 import java.util.*;
+import java.net.*;
+import java.lang.*;
 
 public class bnserver {
     private TreeMap<Integer, String> localKeyData; //Sorts automatically by key, which is helpful for deciding where to store keys without extra steps
@@ -9,7 +11,9 @@ public class bnserver {
     private int successorPort = 0;
     private int predecessorId = 0;
     private int predecessorPort = 0;
-
+    private Socket socket = null;
+    
+    
     public bnserver(String configFilePath) {
         this.localKeyData = new TreeMap<Integer, String>();
         this.id = 0;
@@ -22,17 +26,39 @@ public class bnserver {
         //Set up localKeyData
         File configFile = new File(configFilePath);
         mapInit(configFile);
+
     }
+
     public static void main(String[] args) {
         if (args.length < 1) {
             System.out.println("Usage: java bnserver <config_file_path>");
             return;
         }
-
         bnserver server = new bnserver(args[0]);
+        Scanner scanner = new Scanner(System.in);
 
+        // Handles user commands (Lookup, Insert, Delete)
+        new Thread(() -> {
+            // client commands
 
-    }
+        }).start();
+
+        // Handles name servers messaging (Entry, Exit)
+        new Thread(() -> {
+            // name server commands
+            try(ServerSocket serverSocket = new ServerSocket(server.port)) {
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+                    BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    String message = input.readLine();
+                    server.serverCommand(message, clientSocket);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }).start();
+    }    
 
     //Set up instance variables and put all initial values into the Bootstrap Server's map
     private void mapInit(File configFile) {
@@ -67,4 +93,141 @@ public class bnserver {
         }
     }
 
+    // helper to process user Command (Lookup, Insert, Delete)
+    private void userCommand(String commandLine) {
+        
+            String[] commandParts = commandLine.split(" ");
+            String command = commandParts[0];
+            if (command.equalsIgnoreCase("Lookup")) {
+                if (commandParts.length < 2) {
+                    System.out.println("Lookup command requires a key");
+                } else {
+                    try {
+                        int key = Integer.parseInt(commandParts[1]);
+                        
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid key format. Key should be an integer.");
+                    }
+                }
+                
+
+            } else if (command.equalsIgnoreCase("Insert")) {
+
+
+            } else if (command.equalsIgnoreCase("Delete")) {
+
+            } else {
+
+            System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
+            }
+        }
+
+    // helper to process commands from name server (Entry, Exit)
+    private void serverCommand(String message,  Socket socket) {
+        String commandParts[] = message.split(" ");
+        String command = commandParts[0];
+        
+        if (command.equalsIgnoreCase("Entry")) {
+            System.out.println("Received Entry command from name server.");
+            int newNodeId = Integer.parseInt(commandParts[1]);
+            int newNodePort = Integer.parseInt(commandParts[2]);
+            if (ownId(newNodeId) == true) { // Id in bootServer's range
+                if (predecessorId == id && successorId == id) { // Only 1 node in ring
+                        // Send message to new node with succesor/predecessor info
+                         // BootServer is only server in ring
+                        try {
+                            Socket newNodeSocket = new Socket("LocalHost", newNodePort);
+                            PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
+                            String entryRespondMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port;
+                            // Message: "Entry_OK <id> <port> <successorId> <successorPort>"
+                            output.println(entryRespondMessage);
+                            // Update successor/predecessor info
+                            successorId = newNodeId;
+                            successorPort = newNodePort;
+                            predecessorId = newNodeId;
+                            predecessorPort = newNodePort;
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                } else {
+                    // Send message to new node with succesor/predecessor info
+                    try {
+                        Socket newNodeSocket = new Socket("LocalHost", newNodePort);
+                        PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
+                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " " + predecessorPort;
+                        //Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId> <predecessorPort>"
+                        output.println(entryMessage);
+                        // Update predecessor info
+                        predecessorId = newNodeId;
+                        predecessorPort = newNodePort;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } else {
+                // Forward message to succesor
+                try {
+                    Socket successorSocket = new Socket("LocalHost", successorPort);
+                    PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                    output.println(message);
+                    // Probably add header to track which servers have seen this message
+                    // <message> <> <> <>
+                    // <tracker> <id1, id2, id3....>
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (command.equalsIgnoreCase("INFO_REQUEST")) {
+
+        } else if (command.equalsIgnoreCase("Exit")) {
+
+        } else {
+            System.out.println("Invalid command from name server. Please use Entry or Exit.");
+        }
+
+
+         // Process the message/command from the name server
+
+
+
+    }
+
+    // helper to receive entry message from name server
+    private void entry(Socket socket) {
+          
+
+    }
+
+    private void insert(int key, String value) {
+
+    }
+
+    private void delete(int key) {
+
+    }
+
+    // check if Id is in BootServers'range
+    private boolean ownId(int key) {
+        if (predecessorId == id) {
+            return true; // 1 node in ring
+        } 
+        if (predecessorId < id) { // regular case
+            if (key > predecessorId && key <= id) { // key belongs to this node
+                return true;
+            }   else {
+                return false;
+            }
+
+        } else if (predecessorId > id) { // ring case
+            if (key > predecessorId || key <= id) { // key either 0 or belongs to ranges
+                return true;
+            } else {
+                return false;
+            }
+
+        }
+        return false;}
 }
+
+

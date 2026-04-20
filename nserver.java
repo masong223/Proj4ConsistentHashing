@@ -1,5 +1,6 @@
 import java.io.*;
 import java.util.*;
+import java.net.*;
 
 public class nserver {
     private TreeMap<Integer, String> localKeyData;
@@ -13,11 +14,18 @@ public class nserver {
     private String bserverIp;
     private int bserverPort;
 
+    private Socket socket = null;
+
+    BufferedInputStream ninput = null;
+    PrintWriter noutput = null;
+
+
     public nserver(String configFilePath) {
         this.localKeyData = new TreeMap<Integer, String>();
         //Set up localKeyData and init variables
         File configFile = new File(configFilePath);
         mapInit(configFile);
+
     }
 
     public static void main(String[] args) {
@@ -25,8 +33,51 @@ public class nserver {
             System.out.println("Usage: java nserver <config_file_path>");
             return;
         }
-
         nserver server = new nserver(args[0]);
+        Scanner scanner = new Scanner(System.in);
+        new Thread(() -> {
+        while (true) {
+
+            if (scanner.hasNextLine()) {
+                String commandLine = scanner.nextLine();
+                String[] commandParts = commandLine.split(" ");
+                String command = commandParts[0];
+                if (command.equalsIgnoreCase("Entry")) {
+                    server.connectToBootstrap();
+                    server.entry(server.socket);
+                } else if (command.equalsIgnoreCase("Exit")) {
+    
+                }
+
+            }
+
+        }
+        }).start();
+        
+        new Thread(() -> {
+            // For receiving messages from servers
+            try (ServerSocket serverSocket = new ServerSocket(server.port)) {
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+                    BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    String message = input.readLine();
+                    // Testing message reception
+                    // We could make a method that handles different responses
+                    // Entry_OK, Exit_OK, UPDATE_SUCCESSOR, etc
+                    // Example in bnserver
+                    String messageParts[] = message.split(" ");
+                    String respond = messageParts[0];
+                    if (respond.equalsIgnoreCase("Entry_OK") ) {
+                        System.out.println("Entry successful");
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            
+        }).start();
+
     }
 
    private void mapInit(File configFile) {
@@ -59,4 +110,27 @@ public class nserver {
             e.printStackTrace();
         }
     }
+
+    // helper to initiate connection to bootstrap + streams setup
+    
+    private void connectToBootstrap() {
+         try {
+            this.socket = new Socket(bserverIp, bserverPort);
+            System.out.println("Connected to bnserver at " + bserverIp + ":" + bserverPort);
+            this.ninput = new BufferedInputStream(socket.getInputStream());
+            this.noutput = new PrintWriter(socket.getOutputStream(), true);  
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+    }
+
+    // helper to send entry message to bootstrap
+    // Message: "Entry <id> <port>"
+    private void entry(Socket socket) {
+        String entryMessage = "Entry " + id + " " + port;
+        noutput.println(entryMessage);
+        
+    }
+
 }
