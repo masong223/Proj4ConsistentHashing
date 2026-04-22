@@ -69,6 +69,31 @@ public class nserver {
                     String respond = messageParts[0];
                     if (respond.equalsIgnoreCase("Entry_OK") ) {
                         System.out.println("Entry successful");
+
+                        server.successorId = Integer.parseInt(messageParts[1]);
+                        server.successorPort = Integer.parseInt(messageParts[2]);
+                        server.predecessorId = Integer.parseInt(messageParts[3]);
+                        server.predecessorPort = Integer.parseInt(messageParts[4]);
+                        
+                        String traversalList = messageParts[5];
+                        
+                        int predId = server.predecessorId;
+                        int myId = server.id;
+
+                        if (predId < myId) {
+                            //Prev node + 1 to myId
+                            System.out.println("Key range managed: " + (predId + 1) + ", " + myId);
+                        } else if (predId > myId) {
+                            //Wrapping case
+                            System.out.println("Range: " + (predId + 1) + ", 1023 and 0, " + myId);
+                        }
+                        System.out.println("Successor ID: " + server.successorId);
+                        System.out.println("Predecessor ID: " + server.predecessorId);
+                        System.out.println("Servers traversed: " + traversalList);
+                    } else if (respond.equalsIgnoreCase("update_successor")) {
+                        server.successorId = Integer.parseInt(messageParts[1]);
+                        server.successorPort = Integer.parseInt(messageParts[2]);
+                        System.out.println("Updated successor to: " + server.successorId);
                     }
                 }
             } catch (IOException e) {
@@ -132,5 +157,26 @@ public class nserver {
         noutput.println(entryMessage);
         
     }
+
+    private boolean ownId(int key) {
+        if (predecessorId == id) {
+            return true; // 1 node in ring
+        } 
+        if (predecessorId < id) { // regular case
+            if (key > predecessorId && key <= id) { // key belongs to this node
+                return true;
+            }   else {
+                return false;
+            }
+
+        } else if (predecessorId > id) { // ring case
+            if (key > predecessorId || key <= id) { // key either 0 or belongs to ranges
+                return true;
+            } else {
+                return false;
+            }
+
+        }
+        return false;}
 
 }

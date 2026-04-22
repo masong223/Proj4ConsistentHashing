@@ -131,14 +131,20 @@ public class bnserver {
             System.out.println("Received Entry command from name server.");
             int newNodeId = Integer.parseInt(commandParts[1]);
             int newNodePort = Integer.parseInt(commandParts[2]);
+            String traversalList = "";
+            if (commandParts.length > 3) {
+                traversalList = commandParts[3];
+            }
             if (ownId(newNodeId) == true) { // Id in bootServer's range
+                String idTravseralListFinal = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
                 if (predecessorId == id && successorId == id) { // Only 1 node in ring
                         // Send message to new node with succesor/predecessor info
                          // BootServer is only server in ring
                         try {
                             Socket newNodeSocket = new Socket("LocalHost", newNodePort);
                             PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
-                            String entryRespondMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port;
+                            
+                            String entryRespondMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port + " " + idTravseralListFinal;
                             // Message: "Entry_OK <id> <port> <successorId> <successorPort>"
                             output.println(entryRespondMessage);
                             // Update successor/predecessor info
@@ -155,9 +161,17 @@ public class bnserver {
                     try {
                         Socket newNodeSocket = new Socket("LocalHost", newNodePort);
                         PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
-                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " " + predecessorPort;
+                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port + " " + idTravseralListFinal;
                         //Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId> <predecessorPort>"
                         output.println(entryMessage);
+
+
+                        // Send message to predecessor to update its info
+                        Socket oldPredecessorSocket = new Socket("LocalHost", predecessorPort);
+                        PrintWriter oldPredecessorOutput = new PrintWriter(oldPredecessorSocket.getOutputStream(), true);
+                        String updatePredecessorMessage = "update_successor " + newNodeId + " " + newNodePort;
+                        oldPredecessorOutput.println(updatePredecessorMessage);
+
                         // Update predecessor info
                         predecessorId = newNodeId;
                         predecessorPort = newNodePort;
@@ -170,7 +184,11 @@ public class bnserver {
                 try {
                     Socket successorSocket = new Socket("LocalHost", successorPort);
                     PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
-                    output.println(message);
+
+                    //If the traversal list is empty, add the node id. If it's not empty, append id onto it. Separated by commas to avoid " " splitting
+                    String updatedTraversalList = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
+                    String messageToForward = "Entry " + newNodeId + " " + newNodePort + " " + updatedTraversalList;
+                    output.println(messageToForward);
                     // Probably add header to track which servers have seen this message
                     // <message> <> <> <>
                     // <tracker> <id1, id2, id3....>
@@ -180,6 +198,13 @@ public class bnserver {
             }
         } else if (command.equalsIgnoreCase("INFO_REQUEST")) {
 
+        } else if (command.equalsIgnoreCase("update_successor")) {
+            int newSuccessorId = Integer.parseInt(commandParts[1]);
+            int newSuccessorPort = Integer.parseInt(commandParts[2]);
+            successorId = newSuccessorId;
+            successorPort = newSuccessorPort;
+            System.out.println("Updated successor to: " + successorId);
+            
         } else if (command.equalsIgnoreCase("Exit")) {
 
         } else {
