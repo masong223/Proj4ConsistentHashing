@@ -45,7 +45,8 @@ public class nserver {
                 if (command.equalsIgnoreCase("Entry")) {
                     server.connectToBootstrap();
                     server.entry(server.socket);
-                } else if (command.equalsIgnoreCase("Exit")) {
+                } 
+                else if (command.equalsIgnoreCase("Exit")) {
     
                 }
 
@@ -94,6 +95,52 @@ public class nserver {
                         server.successorId = Integer.parseInt(messageParts[1]);
                         server.successorPort = Integer.parseInt(messageParts[2]);
                         System.out.println("Updated successor to: " + server.successorId);
+                    } else if (respond.equals("Entry")) {
+                        int newNodeId = Integer.parseInt(messageParts[1]);
+                        int newNodePort = Integer.parseInt(messageParts[2]);
+                        String traversalList = messageParts[3];
+                        
+                        if (server.ownId(newNodeId)) {
+                            //transfer keys to new node
+                            Socket transferSocket = new Socket("Localhost", newNodePort);
+                            PrintWriter output = new PrintWriter(transferSocket.getOutputStream(), true);
+
+                            SortedMap<Integer, String> keysToTransfer = server.localKeyData.subMap(server.predecessorId + 1, newNodeId + 1);
+                            List<Integer> keys = new ArrayList<>(keysToTransfer.keySet());
+
+                            for (Integer key : keys) {
+                                String value = server.localKeyData.get(key);
+                                output.println("KeyTransfer " + key + " " + value);
+                                server.localKeyData.remove(key);
+                            }
+                            
+                            String response = "Entry_OK " + server.id + " " + server.port + " " + server.predecessorId + " " + server.predecessorPort + " " + traversalList + "," + server.id;
+
+                            Socket predecessorSocket = new Socket("Localhost", server.predecessorPort);
+                            PrintWriter predecessorUpdater = new PrintWriter(predecessorSocket.getOutputStream(), true);
+
+                            predecessorUpdater.println("update_successor " + newNodeId + " " + newNodePort);
+                            output.println(response);
+                            transferSocket.close();
+                            predecessorSocket.close();
+
+                            server.predecessorId = newNodeId;
+                            server.predecessorPort = newNodePort;
+                            
+                            System.out.println("New node " + newNodeId + " has entered. Updated predecessor to: " + server.predecessorId);
+                        
+                        } else {
+                            // Forward the entry message to the successor
+                            server.socket = new Socket("Localhost", server.successorPort);
+                            PrintWriter output = new PrintWriter(server.socket.getOutputStream(), true);
+                            String updatedTraversal = traversalList + "," + server.id;
+                            output.println("Entry " + newNodeId + " " + newNodePort + " " + updatedTraversal);
+                        }
+                    } else if (respond.equalsIgnoreCase("KeyTransfer:")) {
+                        int key = Integer.parseInt(messageParts[1]);
+                        String value = messageParts[2];
+                        server.localKeyData.put(key, value);
+                        System.out.println("Received key transfer: " + key + " -> " + value);
                     }
                 }
             } catch (IOException e) {
