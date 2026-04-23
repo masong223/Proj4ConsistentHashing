@@ -51,7 +51,7 @@ public class bnserver {
                     Socket clientSocket = serverSocket.accept();
                     BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                     String message = input.readLine();
-                    server.serverCommand(message, clientSocket);
+                    server.serverCommand(message, clientSocket, server);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -123,7 +123,7 @@ public class bnserver {
         }
 
     // helper to process commands from name server (Entry, Exit)
-    private void serverCommand(String message,  Socket socket) {
+    private void serverCommand(String message,  Socket socket, bnserver server) {
         String commandParts[] = message.split(" ");
         String command = commandParts[0];
         
@@ -157,11 +157,26 @@ public class bnserver {
                             e.printStackTrace();
                         }
                 } else {
-                    // Send message to new node with succesor/predecessor info
+                    // Case when entering server's ID is in the bootserver's range.
                     try {
+
                         Socket newNodeSocket = new Socket("LocalHost", newNodePort);
                         PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
-                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port + " " + idTravseralListFinal;
+
+                        /*
+                        SortedMap<Integer, String> keysToTransfer = server.localKeyData.subMap(server.predecessorId + 1, newNodeId + 1);
+                        List<Integer> keys = new ArrayList<>(keysToTransfer.keySet());
+
+                        output.println("KeyTransferStart");
+                        for (Integer key : keys) {
+                            String value = server.localKeyData.get(key);
+                            output.println("KeyTransfer: " + key + " " + value);
+                            server.localKeyData.remove(key);
+                        }
+                        output.println("KeyTransferEnd");
+                        */
+
+                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " " + predecessorPort + " " + idTravseralListFinal;
                         //Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId> <predecessorPort>"
                         output.println(entryMessage);
 

@@ -14,7 +14,7 @@ public class nserver {
     private String bserverIp;
     private int bserverPort;
 
-    private Socket socket = null;
+    Socket socket = null;
 
     BufferedInputStream ninput = null;
     PrintWriter noutput = null;
@@ -58,18 +58,17 @@ public class nserver {
         new Thread(() -> {
             // For receiving messages from servers
             try (ServerSocket serverSocket = new ServerSocket(server.port)) {
+                boolean inTransfer = false;
                 while (true) {
                     Socket clientSocket = serverSocket.accept();
                     BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                     String message = input.readLine();
-                    // Testing message reception
-                    // We could make a method that handles different responses
-                    // Entry_OK, Exit_OK, UPDATE_SUCCESSOR, etc
-                    // Example in bnserver
                     String messageParts[] = message.split(" ");
                     String respond = messageParts[0];
                     if (respond.equalsIgnoreCase("Entry_OK") ) {
                         System.out.println("Entry successful");
+ 
+                      
 
                         server.successorId = Integer.parseInt(messageParts[1]);
                         server.successorPort = Integer.parseInt(messageParts[2]);
@@ -77,17 +76,9 @@ public class nserver {
                         server.predecessorPort = Integer.parseInt(messageParts[4]);
                         
                         String traversalList = messageParts[5];
-                        
-                        int predId = server.predecessorId;
-                        int myId = server.id;
 
-                        if (predId < myId) {
-                            //Prev node + 1 to myId
-                            System.out.println("Key range managed: " + (predId + 1) + ", " + myId);
-                        } else if (predId > myId) {
-                            //Wrapping case
-                            System.out.println("Range: " + (predId + 1) + ", 1023 and 0, " + myId);
-                        }
+                        System.out.println("Key range managed: " + (server.predecessorId + 1) + ", " + server.id);
+                        
                         System.out.println("Successor ID: " + server.successorId);
                         System.out.println("Predecessor ID: " + server.predecessorId);
                         System.out.println("Servers traversed: " + traversalList);
@@ -102,17 +93,21 @@ public class nserver {
                         
                         if (server.ownId(newNodeId)) {
                             //transfer keys to new node
+                            
                             Socket transferSocket = new Socket("Localhost", newNodePort);
                             PrintWriter output = new PrintWriter(transferSocket.getOutputStream(), true);
-
+                            /* NOT WORKING RIGHT NOW
                             SortedMap<Integer, String> keysToTransfer = server.localKeyData.subMap(server.predecessorId + 1, newNodeId + 1);
                             List<Integer> keys = new ArrayList<>(keysToTransfer.keySet());
 
+                            output.println("Key Transfer Start");
                             for (Integer key : keys) {
                                 String value = server.localKeyData.get(key);
-                                output.println("KeyTransfer " + key + " " + value);
+                                output.println("KeyTransfer: " + key + " " + value);
                                 server.localKeyData.remove(key);
                             }
+                            output.println("Key Transfer End");
+                            */
                             
                             String response = "Entry_OK " + server.id + " " + server.port + " " + server.predecessorId + " " + server.predecessorPort + " " + traversalList + "," + server.id;
 
@@ -131,16 +126,22 @@ public class nserver {
                         
                         } else {
                             // Forward the entry message to the successor
-                            server.socket = new Socket("Localhost", server.successorPort);
-                            PrintWriter output = new PrintWriter(server.socket.getOutputStream(), true);
+                            Socket successorSocket = new Socket("Localhost", server.successorPort);
+                            PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                             String updatedTraversal = traversalList + "," + server.id;
                             output.println("Entry " + newNodeId + " " + newNodePort + " " + updatedTraversal);
+                            successorSocket.close();
                         }
-                    } else if (respond.equalsIgnoreCase("KeyTransfer:")) {
+                    } else if (respond.equalsIgnoreCase("KeyTransferStart")) {
+                        inTransfer = true;
+                    } else if (inTransfer && respond.equalsIgnoreCase("KeyTransfer:")) {
                         int key = Integer.parseInt(messageParts[1]);
                         String value = messageParts[2];
                         server.localKeyData.put(key, value);
                         System.out.println("Received key transfer: " + key + " -> " + value);
+                    } else if (respond.equalsIgnoreCase("KeyTransferEnd")) {
+                        System.out.println("Key transfer complete");
+                        inTransfer = false;
                     }
                 }
             } catch (IOException e) {
