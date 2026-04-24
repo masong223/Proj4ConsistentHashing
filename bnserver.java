@@ -118,7 +118,7 @@ public class bnserver {
             if (key > predecessorId || predecessorId == 0 && successorId == 0) {
                 String value = localKeyData.get(key);
                 if (value != null) {
-                    System.out.println("Lookup result: " + value);
+                    System.out.println("Lookup result: " + value + " found at server " + id);
                 } else {
                     System.out.println("Key not found.");
                 }
@@ -172,9 +172,37 @@ public class bnserver {
             } catch (NumberFormatException e) {
                 System.out.println("Invalid key format. Key should be an integer.");
             }
-        } else if (command.equalsIgnoreCase("Insert")) {
-
         } else if (command.equalsIgnoreCase("Delete")) {
+            if (commandParts.length < 2) {
+                System.out.println("Delete command requires a key");
+                return;
+            }
+            try {
+                int key = Integer.parseInt(commandParts[1]);
+                if (key > predecessorId || predecessorId == 0 && successorId == 0) {
+                    String removedValue = localKeyData.remove(key);
+                    if (removedValue != null) {
+                        System.out.println("Deleted key: " + key + ", value: " + removedValue + " from server " + id);
+                    } else {
+                        System.out.println("Key not found. Nothing deleted.");
+                    }
+                } else {
+                    try {
+                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                        output.println(command + " " + key + " 0"); // the "0" is the beginning of the traversal list.
+                        BufferedReader input = new BufferedReader(new InputStreamReader(successorSocket.getInputStream()));
+                        String response = input.readLine();
+                        System.out.println("Successful Deletion of key: " + key + " " + response);
+                        successorSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid key format. Key should be an integer.");
+            }
 
         } else if (command.equalsIgnoreCase("info")) {
             System.out.println("Node ID: " + id);
@@ -321,7 +349,7 @@ public class bnserver {
             }
 
         } else if (command.equalsIgnoreCase("Key") || command.equalsIgnoreCase("Lookup")
-                || command.equalsIgnoreCase("Insert") || command.equalsIgnoreCase("Delete")) {
+                || command.equalsIgnoreCase("Insert") || command.equalsIgnoreCase("Successful")) {
             System.out.println(message);
         } else if (command.equalsIgnoreCase("update_successor")) {
             int newSuccessorId = Integer.parseInt(commandParts[1]);

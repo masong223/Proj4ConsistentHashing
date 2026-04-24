@@ -196,7 +196,7 @@ public class nserver {
                             try {
                                 Socket successorSocket = new Socket("LocalHost", server.successorPort);
                                 PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
-                                output.println(message + "," + server.id); // the "0" is the beginning of the traversal list.
+                                output.println(message + "," + server.id); 
                                 BufferedReader inputFromSuccessor = new BufferedReader(
                                         new InputStreamReader(successorSocket.getInputStream()));
                                 String response = inputFromSuccessor.readLine();
@@ -219,7 +219,33 @@ public class nserver {
                             try {
                                 Socket successorSocket = new Socket("LocalHost", server.successorPort);
                                 PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
-                                output.println(message + "," + server.id); // the "0" is the beginning of the traversal list.
+                                output.println(message + "," + server.id); 
+                                BufferedReader inputFromSuccessor = new BufferedReader(
+                                        new InputStreamReader(successorSocket.getInputStream()));
+                                String response = inputFromSuccessor.readLine();
+                                PrintWriter outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
+                                outputToClient.println(response);
+                                successorSocket.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    } else if (respond.equalsIgnoreCase("Delete")) {
+                        int key = Integer.parseInt(messageParts[1]);
+                        if (key > server.predecessorId && key <= server.id) {
+                            String removedValue = server.localKeyData.remove(key);
+                            System.out.println("Deleted key: " + key + " from server " + server.id);
+                            PrintWriter outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
+                            if (removedValue != null) {
+                                outputToClient.println("Successful Deletion at node " + server.id + ". Traversal: " + messageParts[2] + "," + server.id);
+                            } else {
+                                outputToClient.println("Key not found for deletion. Traversal: " + messageParts[2] + "," + server.id);
+                            }
+                        } else {
+                            try {
+                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                                output.println(message + "," + server.id); 
                                 BufferedReader inputFromSuccessor = new BufferedReader(
                                         new InputStreamReader(successorSocket.getInputStream()));
                                 String response = inputFromSuccessor.readLine();
