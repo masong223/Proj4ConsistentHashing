@@ -231,15 +231,21 @@ public class bnserver {
                 PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                 output.println("Sending_data");
                 for (Map.Entry<Integer, String> entry : localKeyData.entrySet()) {
-                System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
-                output.println(entry.getKey() + entry.getValue());
-                    // Key , Value
-                }
-                output.println("End_data");
+                    System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+                    if (entry.getKey() >= successorId ) {
+                        System.out.println("We do not transfer" + entry.getKey() + entry.getValue());
+                        output.println("End_data");
+                        break;
+                
+                    } else {
+                         output.println(entry.getKey() + entry.getValue());
+                        // Key , Value
+                    }
+                    }
                 successorSocket.close();
-            } catch (IOException e) {
+                } catch (IOException e) {
                 e.printStackTrace();
-            }
+                }
             
 
         } else if (command.equalsIgnoreCase("update_successor")) {

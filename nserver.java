@@ -133,18 +133,41 @@ public class nserver {
                             successorSocket.close();
                         }
                     } else if (respond.equalsIgnoreCase("Request")) {
+                        try {
+                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                                output.println("Sending_data");
+                                for (Map.Entry<Integer, String> entry : server.localKeyData.entrySet()) {
+                                    System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+                                    if (entry.getKey() >= server.successorId) {
+                                        System.out.println("We do not transfer" + entry.getKey() + entry.getValue());
+                                        output.println("End_data");
+                                        break;
+                                
+                                    } else {
+                                        output.println(entry.getKey() + entry.getValue());
+                                        // Key , Value
+                                    }
+                                    }
+                                successorSocket.close();
+                                } catch (IOException e) {
+                                e.printStackTrace();
+                                }
+                            
 
                     } else if (respond.equalsIgnoreCase("Sending_data")) {
                         inTransfer = true;
                         System.out.println("Receiving key transfer...");
                         while(inTransfer) {
-                            if (input.readLine().equalsIgnoreCase("Data_end")) {
+                            String dataLine = input.readLine();
+                            System.out.println("Received data: " + dataLine);
+                            if (input.readLine().equalsIgnoreCase("End_data")) {
                                 System.out.println("Key transfer complete");
                                 inTransfer = false;
                                 break;
                             }
-                            String dataLine = input.readLine();
-                            System.out.println("Received data: " + dataLine);
+                            
+                            
                         }
 
                     
