@@ -39,7 +39,11 @@ public class bnserver {
 
         // Handles user commands (Lookup, Insert, Delete)
         new Thread(() -> {
-            // client commands
+            while (true) {
+                System.out.print("Enter command > ");
+                String commandLine = scanner.nextLine();
+                server.userCommand(commandLine);
+            }
 
         }).start();
 
@@ -101,29 +105,73 @@ public class bnserver {
             if (command.equalsIgnoreCase("Lookup")) {
                 if (commandParts.length < 2) {
                     System.out.println("Lookup command requires a key");
+                    return;
+                } 
+                int key;
+                try {
+                    key = Integer.parseInt(commandParts[1]);
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid key format. Key should be an integer.");
+                    return;
+                }
+                if (key > predecessorId || predecessorId == 0 && successorId == 0) {
+                    String value = localKeyData.get(key);
+                    if (value != null) {
+                        System.out.println("Lookup result: " + value);
+                    } else {
+                        System.out.println("Key not found.");
+                    }
                 } else {
                     try {
-                        int key = Integer.parseInt(commandParts[1]);
-                        
-                    } catch (NumberFormatException e) {
-                        System.out.println("Invalid key format. Key should be an integer.");
+                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                        output.println(command + " " + key + " 0"); //the "0" is the beginning of the traversal list.
+                        BufferedReader input = new BufferedReader(new InputStreamReader(successorSocket.getInputStream()));
+                        String response = input.readLine();
+                        System.out.println("Lookup " + key + " " + response);
+                        successorSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
+            }
                 
 
-            } else if (command.equalsIgnoreCase("Insert")) {
+            else if (command.equalsIgnoreCase("Insert")) {
+                if (commandParts.length < 3) {
+                    System.out.println("Insert command requires a key and a value");
+                    return;
+                } 
+                try {
+                    int key = Integer.parseInt(commandParts[1]);
+                    String value = commandParts[2];
+                        
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid key format. Key should be an integer.");
+                }
+            }
 
 
-            } else if (command.equalsIgnoreCase("Delete")) {
-
-            } else {
-
-            System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
+            else if (command.equalsIgnoreCase("Delete")) {
+                if (commandParts.length < 2) {
+                    System.out.println("Delete command requires a key");
+                    return;
+                } 
+                try {
+                int key = Integer.parseInt(commandParts[1]);
+                        
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid key format. Key should be an integer.");
+                }
+            }
+            else {
+                System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
             }
         }
 
     // helper to process commands from name server (Entry, Exit)
     private void serverCommand(String message,  Socket socket, bnserver server) {
+        System.out.println("Received message from name server: " + message);
         String commandParts[] = message.split(" ");
         String command = commandParts[0];
         
@@ -211,8 +259,8 @@ public class bnserver {
                     e.printStackTrace();
                 }
             }
-        } else if (command.equalsIgnoreCase("INFO_REQUEST")) {
-
+        } else if (command.equalsIgnoreCase("Key") || command.equalsIgnoreCase("Lookup") || command.equalsIgnoreCase("Insert") || command.equalsIgnoreCase("Delete")) {
+            System.out.println(message);
         } else if (command.equalsIgnoreCase("update_successor")) {
             int newSuccessorId = Integer.parseInt(commandParts[1]);
             int newSuccessorPort = Integer.parseInt(commandParts[2]);
@@ -230,20 +278,6 @@ public class bnserver {
          // Process the message/command from the name server
 
 
-
-    }
-
-    // helper to receive entry message from name server
-    private void entry(Socket socket) {
-          
-
-    }
-
-    private void insert(int key, String value) {
-
-    }
-
-    private void delete(int key) {
 
     }
 
