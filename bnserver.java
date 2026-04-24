@@ -149,10 +149,18 @@ public class bnserver {
                 } catch (NumberFormatException e) {
                     System.out.println("Invalid key format. Key should be an integer.");
                 }
-            }
+            } else if (command.equalsIgnoreCase("Insert")) {
 
+            } else if (command.equalsIgnoreCase("Delete")) {
 
-            else if (command.equalsIgnoreCase("Delete")) {
+            } else if (command.equalsIgnoreCase("info")) {
+                    System.out.println("Node ID: " + id);
+                    System.out.println("Port: " + port);
+                    System.out.println("Predecessor ID: " + predecessorId);
+                    System.out.println("Predecessor Port: " + predecessorPort);
+                    System.out.println("Successor ID: " + successorId);
+                    System.out.println("Successor Port: " + successorPort);
+            } else if (command.equalsIgnoreCase("Delete")) {
                 if (commandParts.length < 2) {
                     System.out.println("Delete command requires a key");
                     return;
@@ -168,6 +176,7 @@ public class bnserver {
                 System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
             }
         }
+        
 
     // helper to process commands from name server (Entry, Exit)
     private void serverCommand(String message,  Socket socket, bnserver server) {
@@ -200,7 +209,8 @@ public class bnserver {
                             successorPort = newNodePort;
                             predecessorId = newNodeId;
                             predecessorPort = newNodePort;
-
+                            newNodeSocket.close();
+                            System.out.println(newNodeSocket.isClosed());
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -238,6 +248,7 @@ public class bnserver {
                         // Update predecessor info
                         predecessorId = newNodeId;
                         predecessorPort = newNodePort;
+                        System.out.println(newNodeSocket.isClosed() + "range in boot");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -252,6 +263,7 @@ public class bnserver {
                     String updatedTraversalList = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
                     String messageToForward = "Entry " + newNodeId + " " + newNodePort + " " + updatedTraversalList;
                     output.println(messageToForward);
+                    successorSocket.close();
                     // Probably add header to track which servers have seen this message
                     // <message> <> <> <>
                     // <tracker> <id1, id2, id3....>
@@ -259,6 +271,29 @@ public class bnserver {
                     e.printStackTrace();
                 }
             }
+        } else if (command.equalsIgnoreCase("Request")) {
+            try {
+                Socket successorSocket = new Socket("LocalHost", successorPort);
+                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                output.println("Sending_data");
+                for (Map.Entry<Integer, String> entry : localKeyData.entrySet()) {
+                    System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+                    if (entry.getKey() >= successorId ) {
+                        System.out.println("We do not transfer" + entry.getKey() + entry.getValue());
+                        output.println("End_data");
+                        break;
+                
+                    } else {
+                         output.println(entry.getKey() + entry.getValue());
+                        // Key , Value
+                    }
+                    }
+                successorSocket.close();
+                } catch (IOException e) {
+                e.printStackTrace();
+                }
+            
+
         } else if (command.equalsIgnoreCase("Key") || command.equalsIgnoreCase("Lookup") || command.equalsIgnoreCase("Insert") || command.equalsIgnoreCase("Delete")) {
             System.out.println(message);
         } else if (command.equalsIgnoreCase("update_successor")) {
@@ -301,7 +336,8 @@ public class bnserver {
             }
 
         }
-        return false;}
+        return false;
+    }
 }
 
 
