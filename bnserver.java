@@ -4,7 +4,8 @@ import java.net.*;
 import java.lang.*;
 
 public class bnserver {
-    private TreeMap<Integer, String> localKeyData; //Sorts automatically by key, which is helpful for deciding where to store keys without extra steps
+    private TreeMap<Integer, String> localKeyData; // Sorts automatically by key, which is helpful for deciding where to
+                                                   // store keys without extra steps
     private int id;
     private int port;
     private int successorId = 0;
@@ -12,18 +13,17 @@ public class bnserver {
     private int predecessorId = 0;
     private int predecessorPort = 0;
     private Socket socket = null;
-    
-    
+
     public bnserver(String configFilePath) {
         this.localKeyData = new TreeMap<Integer, String>();
         this.id = 0;
         this.port = 0;
 
-        //Initially points to iteslf on creation (only 1 node)
+        // Initially points to iteslf on creation (only 1 node)
         this.successorId = 0;
         this.predecessorId = 0;
 
-        //Set up localKeyData
+        // Set up localKeyData
         File configFile = new File(configFilePath);
         mapInit(configFile);
 
@@ -50,7 +50,7 @@ public class bnserver {
         // Handles name servers messaging (Entry, Exit)
         new Thread(() -> {
             // name server commands
-            try(ServerSocket serverSocket = new ServerSocket(server.port)) {
+            try (ServerSocket serverSocket = new ServerSocket(server.port)) {
                 while (true) {
                     Socket clientSocket = serverSocket.accept();
                     BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -62,9 +62,10 @@ public class bnserver {
             }
 
         }).start();
-    }    
+    }
 
-    //Set up instance variables and put all initial values into the Bootstrap Server's map
+    // Set up instance variables and put all initial values into the Bootstrap
+    // Server's map
     private void mapInit(File configFile) {
         try {
             Scanner scanner = new Scanner(configFile);
@@ -79,19 +80,19 @@ public class bnserver {
                     String line = scanner.nextLine();
                     String[] parts = line.split(" ");
                     port = Integer.parseInt(parts[0]);
-                    successorPort = port; //Initially points to itself
-                    predecessorPort = port; //Initially points to itself
+                    successorPort = port; // Initially points to itself
+                    predecessorPort = port; // Initially points to itself
                     i++;
                 } else {
-                String line = scanner.nextLine();
-                String[] parts = line.split(" ");
-                int key = Integer.parseInt(parts[0]);
-                String value = parts[1];
-                localKeyData.put(key, value);
-                i++;
+                    String line = scanner.nextLine();
+                    String[] parts = line.split(" ");
+                    int key = Integer.parseInt(parts[0]);
+                    String value = parts[1];
+                    localKeyData.put(key, value);
+                    i++;
+                }
             }
-        }
-        scanner.close();
+            scanner.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -99,15 +100,51 @@ public class bnserver {
 
     // helper to process user Command (Lookup, Insert, Delete)
     private void userCommand(String commandLine) {
-        
-            String[] commandParts = commandLine.split(" ");
-            String command = commandParts[0];
-            if (command.equalsIgnoreCase("Lookup")) {
-                if (commandParts.length < 2) {
-                    System.out.println("Lookup command requires a key");
-                    return;
-                } 
+
+        String[] commandParts = commandLine.split(" ");
+        String command = commandParts[0];
+        if (command.equalsIgnoreCase("Lookup")) {
+            if (commandParts.length < 2) {
+                System.out.println("Lookup command requires a key");
+                return;
+            }
+            int key;
+            try {
+                key = Integer.parseInt(commandParts[1]);
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid key format. Key should be an integer.");
+                return;
+            }
+            if (key > predecessorId || predecessorId == 0 && successorId == 0) {
+                String value = localKeyData.get(key);
+                if (value != null) {
+                    System.out.println("Lookup result: " + value);
+                } else {
+                    System.out.println("Key not found.");
+                }
+            } else {
+                try {
+                    Socket successorSocket = new Socket("LocalHost", successorPort);
+                    PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                    output.println(command + " " + key + " 0"); // the "0" is the beginning of the traversal list.
+                    BufferedReader input = new BufferedReader(new InputStreamReader(successorSocket.getInputStream()));
+                    String response = input.readLine();
+                    System.out.println("Lookup " + key + " " + response);
+                    successorSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        else if (command.equalsIgnoreCase("Insert")) {
+            if (commandParts.length < 3) {
+                System.out.println("Insert command requires a key and a value");
+                return;
+            }
+            try {
                 int key;
+                String value = commandParts[2];
                 try {
                     key = Integer.parseInt(commandParts[1]);
                 } catch (NumberFormatException e) {
@@ -115,75 +152,59 @@ public class bnserver {
                     return;
                 }
                 if (key > predecessorId || predecessorId == 0 && successorId == 0) {
-                    String value = localKeyData.get(key);
-                    if (value != null) {
-                        System.out.println("Lookup result: " + value);
-                    } else {
-                        System.out.println("Key not found.");
-                    }
+                    localKeyData.put(key, commandParts[2]);
+                    System.out.println("Inserted key: " + key + ", value: " + commandParts[2] + " into server " + id);
                 } else {
                     try {
                         Socket successorSocket = new Socket("LocalHost", successorPort);
                         PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
-                        output.println(command + " " + key + " 0"); //the "0" is the beginning of the traversal list.
-                        BufferedReader input = new BufferedReader(new InputStreamReader(successorSocket.getInputStream()));
+                        output.println(command + " " + key + " " + value + " 0"); // the "0" is the beginning of the traversal list.
+                        BufferedReader input = new BufferedReader(
+                                new InputStreamReader(successorSocket.getInputStream()));
                         String response = input.readLine();
-                        System.out.println("Lookup " + key + " " + response);
+                        System.out.println("Inserted " + "(" + key + ", " + value + ")" + response);
                         successorSocket.close();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
+
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid key format. Key should be an integer.");
             }
-                
+        } else if (command.equalsIgnoreCase("Insert")) {
 
-            else if (command.equalsIgnoreCase("Insert")) {
-                if (commandParts.length < 3) {
-                    System.out.println("Insert command requires a key and a value");
-                    return;
-                } 
-                try {
-                    int key = Integer.parseInt(commandParts[1]);
-                    String value = commandParts[2];
-                        
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid key format. Key should be an integer.");
-                }
-            } else if (command.equalsIgnoreCase("Insert")) {
+        } else if (command.equalsIgnoreCase("Delete")) {
 
-            } else if (command.equalsIgnoreCase("Delete")) {
-
-            } else if (command.equalsIgnoreCase("info")) {
-                    System.out.println("Node ID: " + id);
-                    System.out.println("Port: " + port);
-                    System.out.println("Predecessor ID: " + predecessorId);
-                    System.out.println("Predecessor Port: " + predecessorPort);
-                    System.out.println("Successor ID: " + successorId);
-                    System.out.println("Successor Port: " + successorPort);
-            } else if (command.equalsIgnoreCase("Delete")) {
-                if (commandParts.length < 2) {
-                    System.out.println("Delete command requires a key");
-                    return;
-                } 
-                try {
+        } else if (command.equalsIgnoreCase("info")) {
+            System.out.println("Node ID: " + id);
+            System.out.println("Port: " + port);
+            System.out.println("Predecessor ID: " + predecessorId);
+            System.out.println("Predecessor Port: " + predecessorPort);
+            System.out.println("Successor ID: " + successorId);
+            System.out.println("Successor Port: " + successorPort);
+        } else if (command.equalsIgnoreCase("Delete")) {
+            if (commandParts.length < 2) {
+                System.out.println("Delete command requires a key");
+                return;
+            }
+            try {
                 int key = Integer.parseInt(commandParts[1]);
-                        
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid key format. Key should be an integer.");
-                }
+
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid key format. Key should be an integer.");
             }
-            else {
-                System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
-            }
+        } else {
+            System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
         }
-        
+    }
 
     // helper to process commands from name server (Entry, Exit)
-    private void serverCommand(String message,  Socket socket, bnserver server) {
+    private void serverCommand(String message, Socket socket, bnserver server) {
         System.out.println("Received message from name server: " + message);
         String commandParts[] = message.split(" ");
         String command = commandParts[0];
-        
+
         if (command.equalsIgnoreCase("Entry")) {
             System.out.println("Received Entry command from name server.");
             int newNodeId = Integer.parseInt(commandParts[1]);
@@ -195,25 +216,26 @@ public class bnserver {
             if (ownId(newNodeId) == true) { // Id in bootServer's range
                 String idTravseralListFinal = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
                 if (predecessorId == id && successorId == id) { // Only 1 node in ring
-                        // Send message to new node with succesor/predecessor info
-                         // BootServer is only server in ring
-                        try {
-                            Socket newNodeSocket = new Socket("LocalHost", newNodePort);
-                            PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
-                            
-                            String entryRespondMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port + " " + idTravseralListFinal;
-                            // Message: "Entry_OK <id> <port> <successorId> <successorPort>"
-                            output.println(entryRespondMessage);
-                            // Update successor/predecessor info
-                            successorId = newNodeId;
-                            successorPort = newNodePort;
-                            predecessorId = newNodeId;
-                            predecessorPort = newNodePort;
-                            newNodeSocket.close();
-                            System.out.println(newNodeSocket.isClosed());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+                    // Send message to new node with succesor/predecessor info
+                    // BootServer is only server in ring
+                    try {
+                        Socket newNodeSocket = new Socket("LocalHost", newNodePort);
+                        PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
+
+                        String entryRespondMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port + " "
+                                + idTravseralListFinal;
+                        // Message: "Entry_OK <id> <port> <successorId> <successorPort>"
+                        output.println(entryRespondMessage);
+                        // Update successor/predecessor info
+                        successorId = newNodeId;
+                        successorPort = newNodePort;
+                        predecessorId = newNodeId;
+                        predecessorPort = newNodePort;
+                        newNodeSocket.close();
+                        System.out.println(newNodeSocket.isClosed());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 } else {
                     // Case when entering server's ID is in the bootserver's range.
                     try {
@@ -222,26 +244,29 @@ public class bnserver {
                         PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
 
                         /*
-                        SortedMap<Integer, String> keysToTransfer = server.localKeyData.subMap(server.predecessorId + 1, newNodeId + 1);
-                        List<Integer> keys = new ArrayList<>(keysToTransfer.keySet());
+                         * SortedMap<Integer, String> keysToTransfer =
+                         * server.localKeyData.subMap(server.predecessorId + 1, newNodeId + 1);
+                         * List<Integer> keys = new ArrayList<>(keysToTransfer.keySet());
+                         * 
+                         * output.println("KeyTransferStart");
+                         * for (Integer key : keys) {
+                         * String value = server.localKeyData.get(key);
+                         * output.println("KeyTransfer: " + key + " " + value);
+                         * server.localKeyData.remove(key);
+                         * }
+                         * output.println("KeyTransferEnd");
+                         */
 
-                        output.println("KeyTransferStart");
-                        for (Integer key : keys) {
-                            String value = server.localKeyData.get(key);
-                            output.println("KeyTransfer: " + key + " " + value);
-                            server.localKeyData.remove(key);
-                        }
-                        output.println("KeyTransferEnd");
-                        */
-
-                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " " + predecessorPort + " " + idTravseralListFinal;
-                        //Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId> <predecessorPort>"
+                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " "
+                                + predecessorPort + " " + idTravseralListFinal;
+                        // Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId>
+                        // <predecessorPort>"
                         output.println(entryMessage);
-
 
                         // Send message to predecessor to update its info
                         Socket oldPredecessorSocket = new Socket("LocalHost", predecessorPort);
-                        PrintWriter oldPredecessorOutput = new PrintWriter(oldPredecessorSocket.getOutputStream(), true);
+                        PrintWriter oldPredecessorOutput = new PrintWriter(oldPredecessorSocket.getOutputStream(),
+                                true);
                         String updatePredecessorMessage = "update_successor " + newNodeId + " " + newNodePort;
                         oldPredecessorOutput.println(updatePredecessorMessage);
 
@@ -259,8 +284,10 @@ public class bnserver {
                     Socket successorSocket = new Socket("LocalHost", successorPort);
                     PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
 
-                    //If the traversal list is empty, add the node id. If it's not empty, append id onto it. Separated by commas to avoid " " splitting
-                    String updatedTraversalList = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
+                    // If the traversal list is empty, add the node id. If it's not empty, append id
+                    // onto it. Separated by commas to avoid " " splitting
+                    String updatedTraversalList = traversalList.isEmpty() ? String.valueOf(id)
+                            : traversalList + "," + id;
                     String messageToForward = "Entry " + newNodeId + " " + newNodePort + " " + updatedTraversalList;
                     output.println(messageToForward);
                     successorSocket.close();
@@ -278,23 +305,23 @@ public class bnserver {
                 output.println("Sending_data");
                 for (Map.Entry<Integer, String> entry : localKeyData.entrySet()) {
                     System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
-                    if (entry.getKey() >= successorId ) {
+                    if (entry.getKey() >= successorId) {
                         System.out.println("We do not transfer" + entry.getKey() + entry.getValue());
                         output.println("End_data");
                         break;
-                
+
                     } else {
-                         output.println(entry.getKey() + entry.getValue());
+                        output.println(entry.getKey() + entry.getValue());
                         // Key , Value
                     }
-                    }
-                successorSocket.close();
-                } catch (IOException e) {
-                e.printStackTrace();
                 }
-            
+                successorSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-        } else if (command.equalsIgnoreCase("Key") || command.equalsIgnoreCase("Lookup") || command.equalsIgnoreCase("Insert") || command.equalsIgnoreCase("Delete")) {
+        } else if (command.equalsIgnoreCase("Key") || command.equalsIgnoreCase("Lookup")
+                || command.equalsIgnoreCase("Insert") || command.equalsIgnoreCase("Delete")) {
             System.out.println(message);
         } else if (command.equalsIgnoreCase("update_successor")) {
             int newSuccessorId = Integer.parseInt(commandParts[1]);
@@ -302,17 +329,14 @@ public class bnserver {
             successorId = newSuccessorId;
             successorPort = newSuccessorPort;
             System.out.println("Updated successor to: " + successorId);
-            
+
         } else if (command.equalsIgnoreCase("Exit")) {
 
         } else {
             System.out.println("Invalid command from name server. Please use Entry or Exit.");
         }
 
-
-         // Process the message/command from the name server
-
-
+        // Process the message/command from the name server
 
     }
 
@@ -320,11 +344,11 @@ public class bnserver {
     private boolean ownId(int key) {
         if (predecessorId == id) {
             return true; // 1 node in ring
-        } 
+        }
         if (predecessorId < id) { // regular case
             if (key > predecessorId && key <= id) { // key belongs to this node
                 return true;
-            }   else {
+            } else {
                 return false;
             }
 
@@ -339,5 +363,3 @@ public class bnserver {
         return false;
     }
 }
-
-

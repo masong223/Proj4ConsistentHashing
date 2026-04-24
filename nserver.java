@@ -207,6 +207,29 @@ public class nserver {
                                 e.printStackTrace();
                             }
                         }
+                    } else if (respond.equalsIgnoreCase("Insert")) {
+                        int key = Integer.parseInt(messageParts[1]);
+                        String value = messageParts[2];
+                        if (key > server.predecessorId && key <= server.id) {
+                            server.localKeyData.put(key, value);
+                            System.out.println("Inserted key: " + key + ", value: " + value + " into server " + server.id);
+                            PrintWriter outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
+                            outputToClient.println("Insert successful at node " + server.id + ". Traversal: " + messageParts[3] + "," + server.id);
+                        } else {
+                            try {
+                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                                output.println(message + "," + server.id); // the "0" is the beginning of the traversal list.
+                                BufferedReader inputFromSuccessor = new BufferedReader(
+                                        new InputStreamReader(successorSocket.getInputStream()));
+                                String response = inputFromSuccessor.readLine();
+                                PrintWriter outputToClient = new PrintWriter(clientSocket.getOutputStream(), true);
+                                outputToClient.println(response);
+                                successorSocket.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
                     }
                 }
             } catch (IOException e) {
