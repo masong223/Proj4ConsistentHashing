@@ -270,21 +270,6 @@ public class bnserver {
 
                         Socket newNodeSocket = new Socket("LocalHost", newNodePort);
                         PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
-
-                        /*
-                         * SortedMap<Integer, String> keysToTransfer =
-                         * server.localKeyData.subMap(server.predecessorId + 1, newNodeId + 1);
-                         * List<Integer> keys = new ArrayList<>(keysToTransfer.keySet());
-                         * 
-                         * output.println("KeyTransferStart");
-                         * for (Integer key : keys) {
-                         * String value = server.localKeyData.get(key);
-                         * output.println("KeyTransfer: " + key + " " + value);
-                         * server.localKeyData.remove(key);
-                         * }
-                         * output.println("KeyTransferEnd");
-                         */
-
                         String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " "
                                 + predecessorPort + " " + idTravseralListFinal;
                         // Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId>
@@ -326,24 +311,29 @@ public class bnserver {
                     e.printStackTrace();
                 }
             }
+     
         } else if (command.equalsIgnoreCase("Request")) {
             try {
-                Socket successorSocket = new Socket("LocalHost", successorPort);
-                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                Socket predecessorSocket = new Socket("LocalHost", predecessorPort);
+                PrintWriter output = new PrintWriter(predecessorSocket.getOutputStream(), true);
                 output.println("Sending_data");
-                for (Map.Entry<Integer, String> entry : localKeyData.entrySet()) {
+                Iterator<Map.Entry<Integer, String>> iterator = localKeyData.entrySet().iterator();
+
+                while (iterator.hasNext()) {
+                    Map.Entry<Integer, String> entry = iterator.next();
+
                     System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+
                     if (entry.getKey() >= successorId) {
-                        System.out.println("We do not transfer" + entry.getKey() + entry.getValue());
+                        System.out.println("We do not transfer " + entry.getKey() + " " + entry.getValue());
                         output.println("End_data");
                         break;
-
                     } else {
-                        output.println(entry.getKey() + entry.getValue());
-                        // Key , Value
+                        output.println(entry.getKey() + " " + entry.getValue());
+                        iterator.remove(); // safe removal
                     }
-                }
-                successorSocket.close();
+                } 
+                predecessorSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }

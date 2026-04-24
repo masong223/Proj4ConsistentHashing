@@ -71,6 +71,7 @@ public class nserver {
                     String message = input.readLine();
                     String messageParts[] = message.split(" ");
                     String respond = messageParts[0];
+                    System.out.println("Received message: " + message);
                     if (respond.equalsIgnoreCase("Entry_OK")) {
                         System.out.println("Entry successful");
  
@@ -134,24 +135,29 @@ public class nserver {
                         }
                     } else if (respond.equalsIgnoreCase("Request")) {
                         try {
-                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
-                                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                                Socket predecessorSocket = new Socket("LocalHost", server.predecessorPort);
+                                PrintWriter output = new PrintWriter(predecessorSocket.getOutputStream(), true);
                                 output.println("Sending_data");
-                                for (Map.Entry<Integer, String> entry : server.localKeyData.entrySet()) {
+                                Iterator<Map.Entry<Integer, String>> iterator = server.localKeyData.entrySet().iterator();
+
+                                while (iterator.hasNext()) {
+                                    Map.Entry<Integer, String> entry = iterator.next();
+
                                     System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+
                                     if (entry.getKey() >= server.successorId) {
-                                        System.out.println("We do not transfer" + entry.getKey() + entry.getValue());
+                                        System.out.println("We do not transfer " + entry.getKey() + " " + entry.getValue());
                                         output.println("End_data");
                                         break;
-                                
                                     } else {
-                                        output.println(entry.getKey() + entry.getValue());
-                                        // Key , Value
+                                        output.println(entry.getKey() + " " + entry.getValue());
+                                        iterator.remove(); // safe removal
                                     }
-                                    }
-                                successorSocket.close();
+                                } 
+                                output.println("End_data");
+                                predecessorSocket.close();
                                 } catch (IOException e) {
-                                e.printStackTrace();
+                                     e.printStackTrace();
                                 }
                             
 
@@ -160,25 +166,22 @@ public class nserver {
                         System.out.println("Receiving key transfer...");
                         while(inTransfer) {
                             String dataLine = input.readLine();
+                            
                             System.out.println("Received data: " + dataLine);
-                            if (input.readLine().equalsIgnoreCase("End_data")) {
+                            if (dataLine.equalsIgnoreCase("End_data")) {
                                 System.out.println("Key transfer complete");
                                 inTransfer = false;
                                 break;
+                            } else {
+                                String[] dataParts = dataLine.split(" ");
+                                int key = Integer.parseInt(dataParts[0]);
+                                String value = dataParts[1];
+                                server.localKeyData.put(key, value);
+                                System.out.println("Added key: " + key + ", value: " + value + " to server " + server.id);
                             }
-                            
-                            
                         }
 
                     
-                    } else if (inTransfer && respond.equalsIgnoreCase("KeyTransfer:")) {
-                        int key = Integer.parseInt(messageParts[1]);
-                        String value = messageParts[2];
-                        server.localKeyData.put(key, value);
-                        System.out.println("Received key transfer: " + key + " -> " + value);
-                    } else if (respond.equalsIgnoreCase("KeyTransferEnd")) {
-                        System.out.println("Key transfer complete");
-                        inTransfer = false;
                     } else if (respond.equalsIgnoreCase("Lookup")) {
                         int key = Integer.parseInt(messageParts[1]);
                         if (key > server.predecessorId && key <= server.id) {
