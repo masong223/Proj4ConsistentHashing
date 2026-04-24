@@ -40,6 +40,10 @@ public class bnserver {
         // Handles user commands (Lookup, Insert, Delete)
         new Thread(() -> {
             // client commands
+            while (true) {
+                String commandLine = scanner.nextLine();
+                server.userCommand(commandLine);
+            }
 
         }).start();
 
@@ -116,6 +120,13 @@ public class bnserver {
 
             } else if (command.equalsIgnoreCase("Delete")) {
 
+            } else if (command.equalsIgnoreCase("info")) {
+                    System.out.println("Node ID: " + id);
+                    System.out.println("Port: " + port);
+                    System.out.println("Predecessor ID: " + predecessorId);
+                    System.out.println("Predecessor Port: " + predecessorPort);
+                    System.out.println("Successor ID: " + successorId);
+                    System.out.println("Successor Port: " + successorPort);
             } else {
 
             System.out.println("Invalid command. Please use Lookup, Insert, or Delete.");
@@ -152,7 +163,8 @@ public class bnserver {
                             successorPort = newNodePort;
                             predecessorId = newNodeId;
                             predecessorPort = newNodePort;
-
+                            newNodeSocket.close();
+                            System.out.println(newNodeSocket.isClosed());
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -190,6 +202,7 @@ public class bnserver {
                         // Update predecessor info
                         predecessorId = newNodeId;
                         predecessorPort = newNodePort;
+                        System.out.println(newNodeSocket.isClosed() + "range in boot");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -204,6 +217,7 @@ public class bnserver {
                     String updatedTraversalList = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
                     String messageToForward = "Entry " + newNodeId + " " + newNodePort + " " + updatedTraversalList;
                     output.println(messageToForward);
+                    successorSocket.close();
                     // Probably add header to track which servers have seen this message
                     // <message> <> <> <>
                     // <tracker> <id1, id2, id3....>
@@ -211,7 +225,22 @@ public class bnserver {
                     e.printStackTrace();
                 }
             }
-        } else if (command.equalsIgnoreCase("INFO_REQUEST")) {
+        } else if (command.equalsIgnoreCase("Request")) {
+            try {
+                Socket successorSocket = new Socket("LocalHost", successorPort);
+                PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                output.println("Sending_data");
+                for (Map.Entry<Integer, String> entry : localKeyData.entrySet()) {
+                System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+                output.println(entry.getKey() + entry.getValue());
+                    // Key , Value
+                }
+                output.println("End_data");
+                successorSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            
 
         } else if (command.equalsIgnoreCase("update_successor")) {
             int newSuccessorId = Integer.parseInt(commandParts[1]);
