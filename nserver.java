@@ -145,7 +145,7 @@ public class nserver {
 
                                     System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
 
-                                    if (entry.getKey() >= server.successorId) {
+                                    if (entry.getKey() >= server.predecessorId) {
                                         System.out.println("We do not transfer " + entry.getKey() + " " + entry.getValue());
                                         output.println("End_data");
                                         break;
