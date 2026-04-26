@@ -115,7 +115,7 @@ public class bnserver {
                 System.out.println("Invalid key format. Key should be an integer.");
                 return;
             }
-            if (key > predecessorId || predecessorId == 0 && successorId == 0) {
+            if (key > predecessorId || key == 0 || predecessorId == 0 && successorId == 0) {
                 String value = localKeyData.get(key);
                 if (value != null) {
                     System.out.println("Lookup result: " + value + " found at server " + id);
@@ -179,7 +179,7 @@ public class bnserver {
             }
             try {
                 int key = Integer.parseInt(commandParts[1]);
-                if (key > predecessorId || predecessorId == 0 && successorId == 0) {
+                if (key > predecessorId || key == 0 || predecessorId == 0 && successorId == 0) {
                     String removedValue = localKeyData.remove(key);
                     if (removedValue != null) {
                         System.out.println("Deleted key: " + key + ", value: " + removedValue + " from server " + id);
@@ -324,10 +324,12 @@ public class bnserver {
 
                     System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
 
-                    if (entry.getKey() > predecessorId) {
+                    if (entry.getKey() > predecessorId || entry.getKey() == 0) {
                         System.out.println("We do not transfer " + entry.getKey() + " " + entry.getValue());
-                        output.println("End_data");
-                        break;
+                        if (entry.getKey() != 0) {
+                            output.println("End_data");
+                            break;
+                        }
                     } else {
                         output.println(entry.getKey() + " " + entry.getValue());
                         iterator.remove(); // safe removal
