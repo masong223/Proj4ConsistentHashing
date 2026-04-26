@@ -145,7 +145,7 @@ public class nserver {
 
                                     System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
 
-                                    if (entry.getKey() >= server.predecessorId) {
+                                    if (entry.getKey() > server.predecessorId) {
                                         System.out.println("We do not transfer " + entry.getKey() + " " + entry.getValue());
                                         output.println("End_data");
                                         break;
@@ -155,6 +155,7 @@ public class nserver {
                                     }
                                 } 
                                 output.println("End_data");
+
                                 predecessorSocket.close();
                                 } catch (IOException e) {
                                      e.printStackTrace();
@@ -179,6 +180,7 @@ public class nserver {
                                 server.localKeyData.put(key, value);
                                 System.out.println("Added key: " + key + ", value: " + value + " to server " + server.id);
                             }
+                            
                         }
 
                     
