@@ -44,7 +44,10 @@ public class nserver {
                     if (command.equalsIgnoreCase("Entry")) {
                         server.connectToBootstrap();
                         server.entry(server.socket);
+                        
                     } else if (command.equalsIgnoreCase("Exit")) {
+                        server.connectToBootstrap();
+                        server.exit(server.socket);
 
                     } else if (command.equalsIgnoreCase("info")) {
                     System.out.println("Node ID: " + server.id);
@@ -261,7 +264,58 @@ public class nserver {
                                 e.printStackTrace();
                             }
                         }
-                    }
+                    } else if (respond.equalsIgnoreCase("Exit")) {
+                        int exitingNodeId = Integer.parseInt(messageParts[1]);
+                        int exitingNodePort = Integer.parseInt(messageParts[2]);
+                        int newSuccessorId = Integer.parseInt(messageParts[3]);
+                        int newSuccessorPort = Integer.parseInt(messageParts[4]);
+                        int newPredecessorId = Integer.parseInt(messageParts[5]);
+                        int newPredecessorPort = Integer.parseInt(messageParts[6]);
+
+                        if (exitingNodeId == server.successorId) {
+                            System.out.println("exiting node is my successor");
+                            Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                            PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                            server.successorId = newSuccessorId;
+                            server.successorPort = newSuccessorPort;   
+                            output.println(message);
+                            successorSocket.close();
+                            System.out.println("New successor: " + server.successorId);
+
+                        } else if (exitingNodeId == server.predecessorId) {
+                            System.out.println("exiting node is my predecessor");
+                            Socket exitingSocket = new Socket("LocalHost", server.predecessorPort);
+                            PrintWriter output = new PrintWriter(exitingSocket.getOutputStream(), true);
+                            String request = "request_data"; // signal to predecessor to send keys that belong to me
+                            output.println(request);
+                            exitingSocket.close();
+                            server.predecessorId = newPredecessorId;
+                            server.predecessorPort = newPredecessorPort;
+                            System.out.println("New predecessor: " + server.predecessorId);
+
+
+                        } else {
+                            Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                            PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                            output.println(message);
+                            successorSocket.close();
+                        }
+                    } else if (respond.equalsIgnoreCase("request_data")) {
+                            Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                            PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                            Iterator<Map.Entry<Integer, String>> iterator = server.localKeyData.entrySet().iterator();
+                            output.println("sending_data");
+                                while (iterator.hasNext()) {
+                                    Map.Entry<Integer, String> entry = iterator.next();
+
+                                    System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+                                    output.println(entry.getKey() + " " + entry.getValue());
+                                    iterator.remove(); // safe removal
+                                }
+                                 
+                                output.println("End_data");
+                                successorSocket.close();
+                    } 
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -321,6 +375,12 @@ public class nserver {
     private void entry(Socket socket) {
         String entryMessage = "Entry " + id + " " + port;
         noutput.println(entryMessage);
+
+    }
+
+    private void exit(Socket socket) {
+        String exitMessage = "Exit " + id + " " + port + " " + successorId + " " + successorPort + " " + predecessorId + " " + predecessorPort;
+        noutput.println(exitMessage);
 
     }
 

@@ -55,7 +55,7 @@ public class bnserver {
                     Socket clientSocket = serverSocket.accept();
                     BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                     String message = input.readLine();
-                    server.serverCommand(message, clientSocket, server);
+                    server.serverCommand(message, clientSocket, server , input);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -228,11 +228,11 @@ public class bnserver {
     }
 
     // helper to process commands from name server (Entry, Exit)
-    private void serverCommand(String message, Socket socket, bnserver server) {
+    private void serverCommand(String message, Socket socket, bnserver server, BufferedReader input ) {
         System.out.println("Received message from name server: " + message);
         String commandParts[] = message.split(" ");
         String command = commandParts[0];
-
+        boolean inTransfer = false;
         if (command.equalsIgnoreCase("Entry")) {
             System.out.println("Received Entry command from name server.");
             int newNodeId = Integer.parseInt(commandParts[1]);
@@ -313,6 +313,7 @@ public class bnserver {
             }
      
         } else if (command.equalsIgnoreCase("Request")) {
+            // data is requested by new predeccessor, we use an iterator to dynamically remove data from the TreeMap
             try {
                 Socket predecessorSocket = new Socket("LocalHost", predecessorPort);
                 PrintWriter output = new PrintWriter(predecessorSocket.getOutputStream(), true);
@@ -350,9 +351,78 @@ public class bnserver {
             successorPort = newSuccessorPort;
             System.out.println("Updated successor to: " + successorId);
 
-        } else if (command.equalsIgnoreCase("Exit")) {
+        } else if (command.equalsIgnoreCase("Sending_data")) {
+                // We receive sending_data from node, we parse every value pair/key until read End_data
+                try {
+                    inTransfer = true;
+                    System.out.println("Receiving key transfer...");
+                    while(inTransfer) {
+                        String dataLine = input.readLine();
+                        
+                        System.out.println("Received data: " + dataLine);
+                        if (dataLine.equalsIgnoreCase("End_data")) {
+                            System.out.println("Key transfer complete");
+                            inTransfer = false;
+                            break;
+                        } else {
+                            String[] dataParts = dataLine.split(" ");
+                            int key = Integer.parseInt(dataParts[0]);
+                            String value = dataParts[1];
+                            server.localKeyData.put(key, value);
+                            System.out.println("Added key: " + key + ", value: " + value + " to server " + server.id);
+                        }
+                        
+                    }    
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } 
+                
+    
+            
+        }else if (command.equalsIgnoreCase("Exit")) {
+                int exitingNodeId = Integer.parseInt(commandParts[1]);
+                int exitingNodePort = Integer.parseInt(commandParts[2]);
+                int exitingSuccessorId = Integer.parseInt(commandParts[3]);
+                int exitingSuccessorPort = Integer.parseInt(commandParts[4]);
+                int exitingPredecessorId = Integer.parseInt(commandParts[5]);
+                int exitingPredecessorPort = Integer.parseInt(commandParts[6]);
 
-        } else {
+                try {
+                    if (exitingNodeId == server.successorId) {
+                        System.out.println("exiting node is my successor");
+
+                        successorId = exitingSuccessorId;
+                        successorPort = exitingSuccessorPort;
+
+                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                        output.println(message);
+                        successorSocket.close();
+
+                    } else if (exitingNodeId == predecessorId) {
+                        System.out.println("exiting node is my predecessor");
+
+                        Socket exitingSocket = new Socket("LocalHost", exitingNodePort);
+                        PrintWriter output = new PrintWriter(exitingSocket.getOutputStream(), true);
+                        output.println("request_data");
+                        exitingSocket.close();
+
+                        predecessorId = exitingPredecessorId;
+                        predecessorPort = exitingPredecessorPort;
+
+                    } else {
+                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
+                        output.println(message);
+                        successorSocket.close();
+                    }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+               
+        }  
+        else {
             System.out.println("Invalid command from name server. Please use Entry or Exit.");
         }
 
