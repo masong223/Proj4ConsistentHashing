@@ -131,9 +131,9 @@ public class bnserver {
             if (key > predecessorId || key == 0 || predecessorId == 0 && successorId == 0) {
                 String value = localKeyData.get(key);
                 if (value != null) {
-                    System.out.println("Lookup result: " + value + " found at server " + id);
+                    System.out.println("Lookup result: " + value + " found at server " + id + ". Traversal: " + id);
                 } else {
-                    System.out.println("Key not found.");
+                    System.out.println("Key not found." + ". Traversal: " + id);
                 }
             } else {
                 try {
@@ -166,7 +166,7 @@ public class bnserver {
                 }
                 if (key > predecessorId || predecessorId == 0 && successorId == 0) {
                     localKeyData.put(key, commandParts[2]);
-                    System.out.println("Inserted key: " + key + ", value: " + commandParts[2] + " into server " + id);
+                    System.out.println("Inserted key: " + key + ", value: " + commandParts[2] + " into server " + id + ". Traversal: " + id);
                 } else {
                     try {
                         Socket successorSocket = new Socket(successorIp, successorPort);
