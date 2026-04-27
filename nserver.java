@@ -1,6 +1,6 @@
 import java.io.*;
-import java.util.*;
 import java.net.*;
+import java.util.*;
 
 public class nserver {
     private TreeMap<Integer, String> localKeyData;
@@ -10,6 +10,10 @@ public class nserver {
     private int successorPort = 0;
     private int predecessorId = 0;
     private int predecessorPort = 0;
+
+    private String successorIp;
+    private String predecessorIp;
+    private String myIp;
 
     private String bserverIp;
     private int bserverPort;
@@ -22,6 +26,13 @@ public class nserver {
     public nserver(String configFilePath) {
         this.localKeyData = new TreeMap<Integer, String>();
         // Set up localKeyData and init variables
+        try {
+        //grab our own ip
+        this.myIp = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            this.myIp = "127.0.0.1";
+        }
+        
         File configFile = new File(configFilePath);
         mapInit(configFile);
 
@@ -81,11 +92,14 @@ public class nserver {
                       
 
                         server.successorId = Integer.parseInt(messageParts[1]);
-                        server.successorPort = Integer.parseInt(messageParts[2]);
-                        server.predecessorId = Integer.parseInt(messageParts[3]);
-                        server.predecessorPort = Integer.parseInt(messageParts[4]);
+                        server.successorIp = messageParts[2];
+                        server.successorPort = Integer.parseInt(messageParts[3]);
+    
+                        server.predecessorId = Integer.parseInt(messageParts[4]);
+                        server.predecessorIp = messageParts[5];
+                        server.predecessorPort = Integer.parseInt(messageParts[6]);
 
-                        String traversalList = messageParts[5];
+                        String traversalList = messageParts[7];
 
                         System.out.println("Key range managed: " + (server.predecessorId + 1) + ", " + server.id);
 
@@ -93,52 +107,54 @@ public class nserver {
                         System.out.println("Predecessor ID: " + server.predecessorId);
                         System.out.println("Servers traversed: " + traversalList);
                         clientSocket.close();
-                        Socket successorSocket = new Socket("Localhost", server.successorPort);
+                        Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                         PrintWriter successorOut = new PrintWriter(successorSocket.getOutputStream(), true);
                         successorOut.println("Request");
                         successorSocket.close();   
                     } else if (respond.equalsIgnoreCase("update_successor")) {
                         server.successorId = Integer.parseInt(messageParts[1]);
-                        server.successorPort = Integer.parseInt(messageParts[2]);
+                        server.successorIp = messageParts[2];
+                        server.successorPort = Integer.parseInt(messageParts[3]);
+
                         System.out.println("Updated successor to: " + server.successorId);
                     } else if (respond.equals("Entry")) {
                         int newNodeId = Integer.parseInt(messageParts[1]);
-                        int newNodePort = Integer.parseInt(messageParts[2]);
-                        String traversalList = messageParts[3];
+                        String newNodeIp = messageParts[2];
+                        int newNodePort = Integer.parseInt(messageParts[3]);
+                        String traversalList = messageParts[4];
 
                         if (server.ownId(newNodeId)) {
                             // transfer keys to new node
 
-                            Socket transferSocket = new Socket("Localhost", newNodePort);
+                            Socket transferSocket = new Socket(newNodeIp, newNodePort);
                             PrintWriter output = new PrintWriter(transferSocket.getOutputStream(), true);
                             
-                            String response = "Entry_OK " + server.id + " " + server.port + " " + server.predecessorId + " " + server.predecessorPort + " " + traversalList + "," + server.id;
-
-                            Socket predecessorSocket = new Socket("Localhost", server.predecessorPort);
+                            String response = "Entry_OK " + server.id + " " + server.myIp + " " + server.port + " " + server.predecessorId + " " + server.predecessorIp + " " + server.predecessorPort + " " + traversalList + "," + server.id;
+                            Socket predecessorSocket = new Socket(server.predecessorIp, server.predecessorPort);
                             PrintWriter predecessorUpdater = new PrintWriter(predecessorSocket.getOutputStream(), true);
 
-                            predecessorUpdater.println("update_successor " + newNodeId + " " + newNodePort);
-                           // this is to the new node so they update
+                            predecessorUpdater.println("update_successor " + newNodeId + " " + newNodeIp + " " + newNodePort);  // this is to the new node so they update
                             output.println(response);
                             // Going to the same port?
                             transferSocket.close();
                             predecessorSocket.close();
                             server.predecessorId = newNodeId;
                             server.predecessorPort = newNodePort;
+                            server.predecessorIp = newNodeIp;
                             clientSocket.close();
                             System.out.println("New node " + newNodeId + " has entered. Updated predecessor to: " + server.predecessorId);
                         
                         } else {
                             // Forward the entry message to the successor
-                            Socket successorSocket = new Socket("Localhost", server.successorPort);
+                            Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                             PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                             String updatedTraversal = traversalList + "," + server.id;
-                            output.println("Entry " + newNodeId + " " + newNodePort + " " + updatedTraversal);
+                            output.println("Entry " + newNodeId + " " + newNodeIp + " " + newNodePort + " " + updatedTraversal);
                             successorSocket.close();
                         }
                     } else if (respond.equalsIgnoreCase("Request")) {
                         try {
-                                Socket predecessorSocket = new Socket("LocalHost", server.predecessorPort);
+                                Socket predecessorSocket = new Socket(server.predecessorIp, server.predecessorPort);
                                 PrintWriter output = new PrintWriter(predecessorSocket.getOutputStream(), true);
                                 output.println("Sending_data");
                                 Iterator<Map.Entry<Integer, String>> iterator = server.localKeyData.entrySet().iterator();
@@ -202,7 +218,7 @@ public class nserver {
                             outputToClient.println(result);
                         } else {
                             try {
-                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                                Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                                 PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                                 output.println(message + "," + server.id); 
                                 BufferedReader inputFromSuccessor = new BufferedReader(
@@ -225,7 +241,7 @@ public class nserver {
                             outputToClient.println("Insert successful at node " + server.id + ". Traversal: " + messageParts[3] + "," + server.id);
                         } else {
                             try {
-                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                                Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                                 PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                                 output.println(message + "," + server.id); 
                                 BufferedReader inputFromSuccessor = new BufferedReader(
@@ -251,7 +267,7 @@ public class nserver {
                             }
                         } else {
                             try {
-                                Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                                Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                                 PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                                 output.println(message + "," + server.id); 
                                 BufferedReader inputFromSuccessor = new BufferedReader(
@@ -266,42 +282,49 @@ public class nserver {
                         }
                     } else if (respond.equalsIgnoreCase("Exit")) {
                         int exitingNodeId = Integer.parseInt(messageParts[1]);
-                        int exitingNodePort = Integer.parseInt(messageParts[2]);
-                        int newSuccessorId = Integer.parseInt(messageParts[3]);
-                        int newSuccessorPort = Integer.parseInt(messageParts[4]);
-                        int newPredecessorId = Integer.parseInt(messageParts[5]);
-                        int newPredecessorPort = Integer.parseInt(messageParts[6]);
+                        String exitingNodeIp = messageParts[2];
+                        int exitingNodePort = Integer.parseInt(messageParts[3]);
+                        
+                        int newSuccessorId = Integer.parseInt(messageParts[4]);
+                        String newSuccessorIp = messageParts[5];
+                        int newSuccessorPort = Integer.parseInt(messageParts[6]);
+                        
+                        int newPredecessorId = Integer.parseInt(messageParts[7]);
+                        String newPredecessorIp = messageParts[8];
+                        int newPredecessorPort = Integer.parseInt(messageParts[9]);
 
                         if (exitingNodeId == server.successorId) {
                             System.out.println("exiting node is my successor");
-                            Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                            Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                             PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                             server.successorId = newSuccessorId;
-                            server.successorPort = newSuccessorPort;   
+                            server.successorPort = newSuccessorPort;  
+                            server.successorIp = newSuccessorIp; 
                             output.println(message);
                             successorSocket.close();
                             System.out.println("New successor: " + server.successorId);
 
                         } else if (exitingNodeId == server.predecessorId) {
                             System.out.println("exiting node is my predecessor");
-                            Socket exitingSocket = new Socket("LocalHost", server.predecessorPort);
+                            Socket exitingSocket = new Socket(exitingNodeIp, exitingNodePort);
                             PrintWriter output = new PrintWriter(exitingSocket.getOutputStream(), true);
                             String request = "request_data"; // signal to predecessor to send keys that belong to me
                             output.println(request);
                             exitingSocket.close();
                             server.predecessorId = newPredecessorId;
                             server.predecessorPort = newPredecessorPort;
+                            server.predecessorIp = newPredecessorIp;
                             System.out.println("New predecessor: " + server.predecessorId);
 
 
                         } else {
-                            Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                            Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                             PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                             output.println(message);
                             successorSocket.close();
                         }
                     } else if (respond.equalsIgnoreCase("request_data")) {
-                            Socket successorSocket = new Socket("LocalHost", server.successorPort);
+                            Socket successorSocket = new Socket(server.successorIp, server.successorPort);
                             PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                             Iterator<Map.Entry<Integer, String>> iterator = server.localKeyData.entrySet().iterator();
                             output.println("sending_data");
@@ -373,13 +396,13 @@ public class nserver {
     // helper to send entry message to bootstrap
     // Message: "Entry <id> <port>"
     private void entry(Socket socket) {
-        String entryMessage = "Entry " + id + " " + port;
+        String entryMessage = "Entry " + id + " " + myIp + " " + port;
         noutput.println(entryMessage);
 
     }
 
     private void exit(Socket socket) {
-        String exitMessage = "Exit " + id + " " + port + " " + successorId + " " + successorPort + " " + predecessorId + " " + predecessorPort;
+        String exitMessage = "Exit " + id + " " + myIp + " " + port + " " + successorId + " " + successorIp + " " + successorPort + " " + predecessorId + " " + predecessorIp + " " + predecessorPort; 
         noutput.println(exitMessage);
 
     }

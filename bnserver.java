@@ -1,7 +1,7 @@
 import java.io.*;
-import java.util.*;
-import java.net.*;
 import java.lang.*;
+import java.net.*;
+import java.util.*;
 
 public class bnserver {
     private TreeMap<Integer, String> localKeyData; // Sorts automatically by key, which is helpful for deciding where to
@@ -12,12 +12,25 @@ public class bnserver {
     private int successorPort = 0;
     private int predecessorId = 0;
     private int predecessorPort = 0;
+
+    private String successorIp;
+    private String predecessorIp;
+    private String myIp;
+
     private Socket socket = null;
 
     public bnserver(String configFilePath) {
         this.localKeyData = new TreeMap<Integer, String>();
         this.id = 0;
         this.port = 0;
+
+        try {
+            this.myIp = InetAddress.getLocalHost().getHostAddress();
+            this.successorIp = this.myIp; // Initially points to itself
+            this.predecessorIp = this.myIp;
+        } catch (UnknownHostException e) {
+            this.myIp = "127.0.0.1";
+        }
 
         // Initially points to iteslf on creation (only 1 node)
         this.successorId = 0;
@@ -124,7 +137,7 @@ public class bnserver {
                 }
             } else {
                 try {
-                    Socket successorSocket = new Socket("LocalHost", successorPort);
+                    Socket successorSocket = new Socket(successorIp, successorPort);
                     PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                     output.println(command + " " + key + " 0"); // the "0" is the beginning of the traversal list.
                     BufferedReader input = new BufferedReader(new InputStreamReader(successorSocket.getInputStream()));
@@ -156,7 +169,7 @@ public class bnserver {
                     System.out.println("Inserted key: " + key + ", value: " + commandParts[2] + " into server " + id);
                 } else {
                     try {
-                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        Socket successorSocket = new Socket(successorIp, successorPort);
                         PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                         output.println(command + " " + key + " " + value + " 0"); // the "0" is the beginning of the traversal list.
                         BufferedReader input = new BufferedReader(
@@ -188,7 +201,7 @@ public class bnserver {
                     }
                 } else {
                     try {
-                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        Socket successorSocket = new Socket(successorIp, successorPort);
                         PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                         output.println(command + " " + key + " 0"); // the "0" is the beginning of the traversal list.
                         BufferedReader input = new BufferedReader(new InputStreamReader(successorSocket.getInputStream()));
@@ -236,10 +249,11 @@ public class bnserver {
         if (command.equalsIgnoreCase("Entry")) {
             System.out.println("Received Entry command from name server.");
             int newNodeId = Integer.parseInt(commandParts[1]);
-            int newNodePort = Integer.parseInt(commandParts[2]);
+            String newNodeIp = commandParts[2];
+            int newNodePort = Integer.parseInt(commandParts[3]);
             String traversalList = "";
-            if (commandParts.length > 3) {
-                traversalList = commandParts[3];
+            if (commandParts.length > 4) {
+                traversalList = commandParts[4];
             }
             if (ownId(newNodeId) == true) { // Id in bootServer's range
                 String idTravseralListFinal = traversalList.isEmpty() ? String.valueOf(id) : traversalList + "," + id;
@@ -247,18 +261,19 @@ public class bnserver {
                     // Send message to new node with succesor/predecessor info
                     // BootServer is only server in ring
                     try {
-                        Socket newNodeSocket = new Socket("LocalHost", newNodePort);
+                        Socket newNodeSocket = new Socket(newNodeIp, newNodePort);
                         PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
 
-                        String entryRespondMessage = "ENTRY_OK " + id + " " + port + " " + id + " " + port + " "
-                                + idTravseralListFinal;
+                        String entryRespondMessage = "ENTRY_OK " + id + " " + myIp + " " + port + " " + id + " " + myIp + " " + port + " " + idTravseralListFinal;
                         // Message: "Entry_OK <id> <port> <successorId> <successorPort>"
                         output.println(entryRespondMessage);
                         // Update successor/predecessor info
                         successorId = newNodeId;
                         successorPort = newNodePort;
+                        successorIp = newNodeIp;
                         predecessorId = newNodeId;
                         predecessorPort = newNodePort;
+                        predecessorIp = newNodeIp;
                         newNodeSocket.close();
                         System.out.println(newNodeSocket.isClosed());
                     } catch (IOException e) {
@@ -268,24 +283,24 @@ public class bnserver {
                     // Case when entering server's ID is in the bootserver's range.
                     try {
 
-                        Socket newNodeSocket = new Socket("LocalHost", newNodePort);
+                        Socket newNodeSocket = new Socket(newNodeIp, newNodePort);
                         PrintWriter output = new PrintWriter(newNodeSocket.getOutputStream(), true);
-                        String entryMessage = "ENTRY_OK " + id + " " + port + " " + predecessorId + " "
-                                + predecessorPort + " " + idTravseralListFinal;
+                        String entryMessage = "ENTRY_OK " + id + " " + myIp + " " + port + " " + predecessorId + " " + predecessorIp + " " + predecessorPort + " " + idTravseralListFinal;
                         // Message: "ENTRY_OK <succesorId> <successorPort> <predecessorId>
                         // <predecessorPort>"
                         output.println(entryMessage);
 
                         // Send message to predecessor to update its info
-                        Socket oldPredecessorSocket = new Socket("LocalHost", predecessorPort);
-                        PrintWriter oldPredecessorOutput = new PrintWriter(oldPredecessorSocket.getOutputStream(),
-                                true);
-                        String updatePredecessorMessage = "update_successor " + newNodeId + " " + newNodePort;
+                        Socket oldPredecessorSocket = new Socket(predecessorIp, predecessorPort);
+                        PrintWriter oldPredecessorOutput = new PrintWriter(oldPredecessorSocket.getOutputStream(), true);
+                        String updatePredecessorMessage = "update_successor " + newNodeId + " " + newNodeIp + " " + newNodePort;
                         oldPredecessorOutput.println(updatePredecessorMessage);
-
-                        // Update predecessor info
+                        //Update info
                         predecessorId = newNodeId;
+                        predecessorIp = newNodeIp;
                         predecessorPort = newNodePort;
+                        newNodeSocket.close();
+                        oldPredecessorSocket.close();
                         System.out.println(newNodeSocket.isClosed() + "range in boot");
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -294,7 +309,7 @@ public class bnserver {
             } else {
                 // Forward message to succesor
                 try {
-                    Socket successorSocket = new Socket("LocalHost", successorPort);
+                    Socket successorSocket = new Socket(successorIp, successorPort);
                     PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
 
                     // If the traversal list is empty, add the node id. If it's not empty, append id
@@ -315,7 +330,7 @@ public class bnserver {
         } else if (command.equalsIgnoreCase("Request")) {
             // data is requested by new predeccessor, we use an iterator to dynamically remove data from the TreeMap
             try {
-                Socket predecessorSocket = new Socket("LocalHost", predecessorPort);
+                Socket predecessorSocket = new Socket(predecessorIp, predecessorPort);
                 PrintWriter output = new PrintWriter(predecessorSocket.getOutputStream(), true);
                 output.println("Sending_data");
                 Iterator<Map.Entry<Integer, String>> iterator = localKeyData.entrySet().iterator();
@@ -381,11 +396,16 @@ public class bnserver {
             
         }else if (command.equalsIgnoreCase("Exit")) {
                 int exitingNodeId = Integer.parseInt(commandParts[1]);
-                int exitingNodePort = Integer.parseInt(commandParts[2]);
-                int exitingSuccessorId = Integer.parseInt(commandParts[3]);
-                int exitingSuccessorPort = Integer.parseInt(commandParts[4]);
-                int exitingPredecessorId = Integer.parseInt(commandParts[5]);
-                int exitingPredecessorPort = Integer.parseInt(commandParts[6]);
+                String exitingNodeIp = commandParts[2];
+                int exitingNodePort = Integer.parseInt(commandParts[3]);
+                
+                int exitingSuccessorId = Integer.parseInt(commandParts[4]);
+                String exitingSuccessorIp = commandParts[5];
+                int exitingSuccessorPort = Integer.parseInt(commandParts[6]);
+                
+                int exitingPredecessorId = Integer.parseInt(commandParts[7]);
+                String exitingPredecessorIp = commandParts[8];
+                int exitingPredecessorPort = Integer.parseInt(commandParts[9]);
 
                 try {
                     if (exitingNodeId == server.successorId) {
@@ -393,8 +413,9 @@ public class bnserver {
 
                         successorId = exitingSuccessorId;
                         successorPort = exitingSuccessorPort;
+                        successorIp = exitingSuccessorIp;
 
-                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        Socket successorSocket = new Socket(successorIp, successorPort);
                         PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                         output.println(message);
                         successorSocket.close();
@@ -402,16 +423,17 @@ public class bnserver {
                     } else if (exitingNodeId == predecessorId) {
                         System.out.println("exiting node is my predecessor");
 
-                        Socket exitingSocket = new Socket("LocalHost", exitingNodePort);
+                        Socket exitingSocket = new Socket(exitingNodeIp, exitingNodePort);
                         PrintWriter output = new PrintWriter(exitingSocket.getOutputStream(), true);
                         output.println("request_data");
                         exitingSocket.close();
 
                         predecessorId = exitingPredecessorId;
                         predecessorPort = exitingPredecessorPort;
+                        predecessorIp = exitingPredecessorIp;
 
                     } else {
-                        Socket successorSocket = new Socket("LocalHost", successorPort);
+                        Socket successorSocket = new Socket(successorIp, successorPort);
                         PrintWriter output = new PrintWriter(successorSocket.getOutputStream(), true);
                         output.println(message);
                         successorSocket.close();
