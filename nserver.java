@@ -338,6 +338,10 @@ public class nserver {
                                  
                                 output.println("End_data");
                                 successorSocket.close();
+
+                                System.out.println("Successful exit");
+                                System.out.println("Handed over key range " + (server.predecessorId + 1) + "-" + server.id + " to Successor ID: " + server.successorId);
+                                System.exit(0);
                     } 
                 }
             } catch (IOException e) {
