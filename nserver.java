@@ -52,7 +52,7 @@ public class nserver {
                     String commandLine = scanner.nextLine();
                     String[] commandParts = commandLine.split(" ");
                     String command = commandParts[0];
-                    if (command.equalsIgnoreCase("Entry")) {
+                    if (command.equalsIgnoreCase("enter")) {
                         server.connectToBootstrap();
                         server.entry(server.socket);
                         
