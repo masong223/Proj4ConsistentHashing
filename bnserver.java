@@ -316,7 +316,7 @@ public class bnserver {
                     // onto it. Separated by commas to avoid " " splitting
                     String updatedTraversalList = traversalList.isEmpty() ? String.valueOf(id)
                             : traversalList + "," + id;
-                    String messageToForward = "Entry " + newNodeId + " " + newNodePort + " " + updatedTraversalList;
+                    String messageToForward = "Entry " + newNodeId + " " + newNodeIp + " " + newNodePort + " " + updatedTraversalList;
                     output.println(messageToForward);
                     successorSocket.close();
                     // Probably add header to track which servers have seen this message
