@@ -361,9 +361,11 @@ public class bnserver {
             System.out.println(message);
         } else if (command.equalsIgnoreCase("update_successor")) {
             int newSuccessorId = Integer.parseInt(commandParts[1]);
-            int newSuccessorPort = Integer.parseInt(commandParts[2]);
+            String newSuccessorIp = commandParts[2];
+            int newSuccessorPort = Integer.parseInt(commandParts[3]); // 
             successorId = newSuccessorId;
             successorPort = newSuccessorPort;
+            successorIp = newSuccessorIp;
             System.out.println("Updated successor to: " + successorId);
 
         } else if (command.equalsIgnoreCase("Sending_data")) {
